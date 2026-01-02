@@ -1,34 +1,48 @@
 const Vendor = require('../models/Vendor');
 const jwt = require('jsonwebtoken');
-const dotEnv = require('dotenv');
-
-dotEnv.config();
-
-
-
+require('dotenv').config();
 
 const secretKey = process.env.WHATISYOURWORK;
 
 const verifyToken = async (req, res, next) => {
-  const token = req.headers.token;
-  if (!token) {
-    return res.status(401).json({ message: 'Access Denied: No Token Provided' });
-  }
-  try{
-    const decoded = jwt.verify(token, secretKey);
-    const vendor = await Vendor.findById(decoded.id);
-    if (!vendor) {
-      return res.status(404).json({ message: 'Access Denied: Invalid Token' });
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res.status(401).json({
+        message: 'Access Denied: No Token Provided'
+      });
     }
 
-    req.vendor = vendor._id;
-    next();
-    
-  } catch (message){
-    console.message(message)
+    // Expected format: Bearer <token>
+    const token = authHeader.split(' ')[1];
 
-    return res.status(500).json({ message: 'Access Denied: Invalid Token' });
-}
-}
+    if (!token) {
+      return res.status(401).json({
+        message: 'Access Denied: Token Missing'
+      });
+    }
+
+    const decoded = jwt.verify(token, secretKey);
+
+    // IMPORTANT: payload key must match token creation
+    const vendor = await Vendor.findById(decoded.vendorId);
+
+    if (!vendor) {
+      return res.status(401).json({
+        message: 'Access Denied: Invalid Token'
+      });
+    }
+
+    req.vendorId = vendor._id;
+    next();
+
+  } catch (error) {
+    console.error(error);
+    return res.status(401).json({
+      message: 'Access Denied: Invalid Token'
+    });
+  }
+};
 
 module.exports = verifyToken;
